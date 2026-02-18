@@ -1,0 +1,41 @@
+# Go build artifacts
+bin/
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.coverprofile
+coverage.*
+*.log
+*.tmp
+
+# Go tooling caches
+*.prof
+*.pprof
+*.trace
+*.bench
+
+# IntelliJ IDEA
+.idea/
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+*.iml
+*.iws
+*.ipr
+
+# OS-specific clutter
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon\r
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
