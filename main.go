@@ -1,7 +1,25 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"syscall"
+)
 
 func main() {
-	fmt.Println("good stuff will come")
+	cmd := exec.Command("bash")
+
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{Cloneflags: syscall.CLONE_NEWUTS}
+
+	fmt.Println("We are doing our thing")
+
+	if err := cmd.Run(); err != nil {
+		fmt.Println("error :", err)
+		return
+	}
 }
