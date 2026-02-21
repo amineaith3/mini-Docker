@@ -37,12 +37,14 @@ func parent() {
 
 func child() {
 	handle(syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")) // Mount and unmount will not propagate to parent
+	handle(syscall.Chroot("/home/houcinee/Downloads/newRoot/"))
+	handle(syscall.Chdir("/"))
 	handle(syscall.Mount("proc", "/proc", "proc", 0, ""))
 
+	os.Setenv("PATH", "/bin:/sbin:/usr/bin:/usr/sbin")
 	binary, err := exec.LookPath(os.Args[2]) // syscall.Exec() requires a full path to the binary
 	handle(err)
-
-	args := os.Args[3:]
+	args := os.Args[2:]
 
 	handle(syscall.Exec(binary, args, os.Environ()))
 }
@@ -50,5 +52,6 @@ func child() {
 func handle(err error) {
 	if err != nil {
 		fmt.Println("error : ", err)
+		os.Exit(1)
 	}
 }
