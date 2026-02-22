@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 )
 
@@ -31,8 +32,16 @@ func parent() {
 		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
 	}
 
-	err := cmd.Run()
-	handle(err)
+	// cgroup logic here
+	handle(os.MkdirAll("/sys/fs/cgroup/miniDocker", 0755))
+	handle(os.WriteFile("/sys/fs/cgroup/miniDocker/memory.max", []byte("104857600"), 0700)) // 100 mo of memory
+
+	handle(cmd.Start())
+	pid := cmd.Process.Pid
+	handle(os.WriteFile("/sys/fs/cgroup/miniDocker/cgroup.procs", []byte(strconv.Itoa(pid)), 0700))
+
+	handle(cmd.Wait())
+	os.RemoveAll("/sys/fs/cgroup/miniDocker") // cleanUP
 }
 
 func child() {
