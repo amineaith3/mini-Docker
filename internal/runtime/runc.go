@@ -1,4 +1,4 @@
-package main
+package runtime
 
 import (
 	"fmt"
@@ -8,19 +8,22 @@ import (
 	"syscall"
 )
 
-func main() {
-	switch os.Args[1] {
+
+
+func Run(args []string) {
+	switch args[1] {
 	case "run":
-		parent()
+		parent(args)
 	case "child":
-		child()
+		child(args)
 	default:
 		panic("Bad usage")
 	}
 }
 
-func parent() {
-	arguments := append([]string{"child"}, os.Args[2:]...)
+func parent(args []string) {
+	arguments := append([]string{"child"}, args[1:]...)
+
 
 	cmd := exec.Command("/proc/self/exe", arguments...)
 
@@ -44,18 +47,19 @@ func parent() {
 	os.RemoveAll("/sys/fs/cgroup/miniDocker") // cleanUP
 }
 
-func child() {
+func child(args []string) {
+
 	handle(syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")) // Mount and unmount will not propagate to parent
 	handle(syscall.Chroot("/home/houcinee/Downloads/newRoot/"))
 	handle(syscall.Chdir("/"))
 	handle(syscall.Mount("proc", "/proc", "proc", 0, ""))
 
 	os.Setenv("PATH", "/bin:/sbin:/usr/bin:/usr/sbin")
-	binary, err := exec.LookPath(os.Args[2]) // syscall.Exec() requires a full path to the binary
+	binary, err := exec.LookPath(args[3]) // syscall.Exec() requires a full path to the binary
 	handle(err)
-	args := os.Args[2:]
+	arguments := args[3:]
 
-	handle(syscall.Exec(binary, args, os.Environ()))
+	handle(syscall.Exec(binary, arguments, os.Environ()))
 }
 
 func handle(err error) {

@@ -14,7 +14,7 @@ A custom container runtime and management system built in Go.
 
 ## Phase 2: Container Management
 
-- [ ] CLI separation (Manager vs Runtime, like docker-cli vs runc)
+- [x] CLI separation (Manager vs Runtime, like docker-cli vs runc)
 - [ ] Persistent storage directory (`/var/lib/minidocker/`) for container metadata
 - [ ] Container state storage (ID, PID, StartTime, Config as JSON)
 - [ ] `minidocker ps` — list active containers
