@@ -1,14 +1,13 @@
 package runtime
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
+
+	"mini-docker/internal/utils"
 )
-
-
 
 func Run(args []string) {
 	switch args[1] {
@@ -24,7 +23,6 @@ func Run(args []string) {
 func parent(args []string) {
 	arguments := append([]string{"child"}, args[1:]...)
 
-
 	cmd := exec.Command("/proc/self/exe", arguments...)
 
 	cmd.Stdin = os.Stdin
@@ -36,35 +34,34 @@ func parent(args []string) {
 	}
 
 	// cgroup logic here
-	handle(os.MkdirAll("/sys/fs/cgroup/miniDocker", 0755))
-	handle(os.WriteFile("/sys/fs/cgroup/miniDocker/memory.max", []byte("104857600"), 0700)) // 100 mo of memory
+	utils.Handle(os.MkdirAll("/sys/fs/cgroup/miniDocker", 0o755))
+	utils.Handle(os.WriteFile("/sys/fs/cgroup/miniDocker/memory.max", []byte("104857600"), 0o700)) // 100 mo of memory
 
-	handle(cmd.Start())
+	// generate meta data
+	json, id := utils.GenJSON("", "created", 0, args[2:])
+	utils.SaveFile(json, id)
+
+	utils.Handle(cmd.Start())
 	pid := cmd.Process.Pid
-	handle(os.WriteFile("/sys/fs/cgroup/miniDocker/cgroup.procs", []byte(strconv.Itoa(pid)), 0700))
+	json, id = utils.GenJSON(id, "started", pid, args[2:])
+	utils.SaveFile(json, id)
 
-	handle(cmd.Wait())
+	utils.Handle(os.WriteFile("/sys/fs/cgroup/miniDocker/cgroup.procs", []byte(strconv.Itoa(pid)), 0o700))
+
+	utils.Handle(cmd.Wait())
 	os.RemoveAll("/sys/fs/cgroup/miniDocker") // cleanUP
 }
 
 func child(args []string) {
-
-	handle(syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")) // Mount and unmount will not propagate to parent
-	handle(syscall.Chroot("/home/houcinee/Downloads/newRoot/"))
-	handle(syscall.Chdir("/"))
-	handle(syscall.Mount("proc", "/proc", "proc", 0, ""))
+	utils.Handle(syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")) // Mount and unmount will not propagate to parent
+	utils.Handle(syscall.Chroot("/home/houcinee/Downloads/newRoot/"))
+	utils.Handle(syscall.Chdir("/"))
+	utils.Handle(syscall.Mount("proc", "/proc", "proc", 0, ""))
 
 	os.Setenv("PATH", "/bin:/sbin:/usr/bin:/usr/sbin")
 	binary, err := exec.LookPath(args[3]) // syscall.Exec() requires a full path to the binary
-	handle(err)
+	utils.Handle(err)
 	arguments := args[3:]
 
-	handle(syscall.Exec(binary, arguments, os.Environ()))
-}
-
-func handle(err error) {
-	if err != nil {
-		fmt.Println("error : ", err)
-		os.Exit(1)
-	}
+	utils.Handle(syscall.Exec(binary, arguments, os.Environ()))
 }
