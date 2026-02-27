@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strconv"
 	"syscall"
+	"time"
 
 	"mini-docker/internal/utils"
 )
@@ -38,17 +39,20 @@ func parent(args []string) {
 	utils.Handle(os.WriteFile("/sys/fs/cgroup/miniDocker/memory.max", []byte("104857600"), 0o700)) // 100 mo of memory
 
 	// generate meta data
-	json, id := utils.GenJSON("", "created", 0, args[2:])
+	createdAt := time.Now()
+	json, id := utils.GenJSON("", "CREATED", 0, args[2:], createdAt)
 	utils.SaveFile(json, id)
 
 	utils.Handle(cmd.Start())
 	pid := cmd.Process.Pid
-	json, id = utils.GenJSON(id, "started", pid, args[2:])
+	json, id = utils.GenJSON(id, "RUNNING", pid, args[2:], createdAt)
 	utils.SaveFile(json, id)
 
 	utils.Handle(os.WriteFile("/sys/fs/cgroup/miniDocker/cgroup.procs", []byte(strconv.Itoa(pid)), 0o700))
 
 	utils.Handle(cmd.Wait())
+	json, id = utils.GenJSON(id, "EXITED", pid, args[2:], createdAt)
+	utils.SaveFile(json, id)
 	os.RemoveAll("/sys/fs/cgroup/miniDocker") // cleanUP
 }
 
