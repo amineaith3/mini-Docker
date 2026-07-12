@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"mini-docker/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 func Run(args []string) {
@@ -27,14 +29,12 @@ func Run(args []string) {
 
 // ./miniDocker run <options> <command> <args>
 func parent(args []string) {
-	containerDirectory := "/home/houcinee/Downloads/newRoot/"
-	command, options := parseRunSpec(args[2:])
-	volumeMounts, err := parseVolumeSpecs(options["-v"], containerDirectory)
-	utils.Handle(err)
-	utils.Handle(setupVolumeMounts(volumeMounts))
-	defer func() {
-		utils.Handle(cleanupVolumeMounts(volumeMounts))
-	}()
+	containerDirectory := os.Getenv("MINIDOCKER_ROOTFS")
+	if containerDirectory == "" {
+		containerDirectory = "/var/lib/minidocker/rootfs"
+	}
+	command, _ := parseRunSpec(args[2:])
+	// Note: volumeMounts setup happens in the child process
 
 	arguments := append([]string{"child"}, args[1:]...)
 
@@ -48,33 +48,38 @@ func parent(args []string) {
 		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
 	}
 
-	// cgroup logic here
-	utils.Handle(os.MkdirAll("/sys/fs/cgroup/miniDocker", 0o755))
-	utils.Handle(os.WriteFile("/sys/fs/cgroup/miniDocker/memory.max", []byte("104857600"), 0o700)) // 100 mo of memory
-
 	// generate meta data
+	containerID := uuid.New().String()
 	createdAt := time.Now()
-	json, id := utils.GenJSON("", "CREATED", 0, command, createdAt)
-	utils.SaveFile(json, id)
+	jsonBytes, _ := utils.GenJSON(containerID, "CREATED", 0, command, createdAt)
+	utils.SaveFile(jsonBytes, containerID)
+
+	// cgroup logic here
+	cgroupPath := filepath.Join("/sys/fs/cgroup", "miniDocker-"+containerID)
+	utils.Handle(os.MkdirAll(cgroupPath, 0o755))
+	utils.Handle(os.WriteFile(filepath.Join(cgroupPath, "memory.max"), []byte("104857600"), 0o700)) // 100 mo of memory
 
 	utils.Handle(cmd.Start())
 	pid := cmd.Process.Pid
-	json, id = utils.GenJSON(id, "RUNNING", pid, command, createdAt)
-	utils.SaveFile(json, id)
+	jsonBytes, _ = utils.GenJSON(containerID, "RUNNING", pid, command, createdAt)
+	utils.SaveFile(jsonBytes, containerID)
 
-	utils.Handle(os.WriteFile("/sys/fs/cgroup/miniDocker/cgroup.procs", []byte(strconv.Itoa(pid)), 0o700))
+	utils.Handle(os.WriteFile(filepath.Join(cgroupPath, "cgroup.procs"), []byte(strconv.Itoa(pid)), 0o700))
 
 	utils.Handle(cmd.Wait())
-	json, id = utils.GenJSON(id, "EXITED", pid, command, createdAt)
-	utils.SaveFile(json, id)
-	os.RemoveAll("/sys/fs/cgroup/miniDocker") // cleanUP
+	jsonBytes, _ = utils.GenJSON(containerID, "EXITED", pid, command, createdAt)
+	utils.SaveFile(jsonBytes, containerID)
+	os.RemoveAll(cgroupPath) // cleanUP
 }
 
 // ./miniDocker child run <options> <command> <args>
 func child(args []string) {
-	containerDirectory := "/home/houcinee/Downloads/newRoot/"
+	containerDirectory := os.Getenv("MINIDOCKER_ROOTFS")
+	if containerDirectory == "" {
+		containerDirectory = "/var/lib/minidocker/rootfs"
+	}
 	command, options := parseRunSpec(args[3:])
-	_, err := parseVolumeSpecs(options["-v"], containerDirectory)
+	volumeMounts, err := parseVolumeSpecs(options["-v"], containerDirectory)
 	utils.Handle(err)
 
 	for opt := range options {
@@ -87,6 +92,10 @@ func child(args []string) {
 	}
 
 	utils.Handle(syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")) // Mount and unmount will not propagate to parent
+
+	// Mount volumes inside the new namespace before chroot
+	utils.Handle(setupVolumeMounts(volumeMounts))
+
 	utils.Handle(syscall.Chroot(containerDirectory))
 	utils.Handle(syscall.Chdir("/"))
 	utils.Handle(syscall.Mount("proc", "/proc", "proc", 0, ""))
