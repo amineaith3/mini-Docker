@@ -55,7 +55,7 @@ func parent(args []string) {
 	utils.SaveFile(jsonBytes, containerID)
 
 	// cgroup logic here
-	cgroupPath := filepath.Join("/sys/fs/cgroup/miniDocker", containerID)
+	cgroupPath := filepath.Join("/sys/fs/cgroup", "miniDocker-"+containerID)
 	utils.Handle(os.MkdirAll(cgroupPath, 0o755))
 	utils.Handle(os.WriteFile(filepath.Join(cgroupPath, "memory.max"), []byte("104857600"), 0o700)) // 100 mo of memory
 
