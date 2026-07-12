@@ -9,14 +9,9 @@ import (
 	"time"
 
 	"mini-docker/internal/models"
-
-	"github.com/google/uuid"
 )
 
 func GenJSON(id string, st string, pid int, command []string, createdAt time.Time) ([]byte, string) {
-	if len(id) == 0 {
-		id = uuid.New().String()
-	}
 	if createdAt.IsZero() {
 		createdAt = time.Now()
 	}
